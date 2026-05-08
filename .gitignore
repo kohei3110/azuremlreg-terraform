@@ -1,0 +1,13 @@
+# Terraform local files
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Local variable files can contain environment-specific values.
+*.tfvars
+!terraform.tfvars.example
+
+# macOS
+.DS_Store

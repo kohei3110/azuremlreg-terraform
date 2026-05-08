@@ -1,0 +1,24 @@
+# Copy this file to terraform.tfvars and adjust the values for your environment.
+
+resource_group_name = "rg-aml-registry-demo"
+location            = "japaneast"
+
+# Registry names are unique within a Microsoft Entra tenant and cannot be changed after creation.
+registry_name = "contoso-mlreg-dev"
+
+# Leave null for a single-region registry in var.location.
+# The primary location must be included when you specify this list.
+replication_locations = null
+
+public_network_access = "Enabled"
+
+# Leave null to let Azure Machine Learning manage the system-created resource group.
+managed_resource_group_resource_id = null
+
+identity_type = "SystemAssigned"
+identity_ids  = []
+
+tags = {
+  environment = "dev"
+  workload    = "azure-machine-learning-registry"
+}
