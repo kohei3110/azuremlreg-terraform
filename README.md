@@ -1,10 +1,10 @@
 # Azure Machine Learning Registry with Terraform
 
-このリポジトリは、Azure Machine Learning Registry を Terraform で構築する最小構成です。
+This repository provides a minimal Terraform configuration for creating an Azure Machine Learning Registry.
 
-`azurerm` provider には Azure Machine Learning Registry 専用リソースがまだ用意されていないため、`azapi_resource` を使って ARM リソース `Microsoft.MachineLearningServices/registries@2025-12-01` を作成します。
+The configuration uses `azapi_resource` to create the ARM resource type `Microsoft.MachineLearningServices/registries@2025-12-01`.
 
-## 構成
+## Repository layout
 
 ```text
 .
@@ -23,38 +23,38 @@
         └── README.md
 ```
 
-## 作成されるリソース
+## Resources created
 
 - Azure Resource Group
 - Azure Machine Learning Registry
 
-Registry が利用する system-created Storage Account / Azure Container Registry は、Azure Machine Learning が作成・利用します。AzAPI で Registry を作る場合は各リージョンに Storage/ACR 詳細が必要なため、このモジュールは既定で名前と SKU を生成して `regionDetails` に含めます。名前や SKU を明示したい場合は `replication_locations` で上書きできます。
+Azure Machine Learning creates and uses the system-created Storage Account and Azure Container Registry (ACR) resources required by the registry. When a registry is created through AzAPI, each `regionDetails` entry must include Storage/ACR details. This module generates default names and SKUs and includes them in `regionDetails`. If you need explicit names or SKUs, override them through `replication_locations`.
 
-## 前提条件
+## Prerequisites
 
 - Terraform `>= 1.6.0`
-- Azure CLI で対象サブスクリプションにログイン済み
-- 対象サブスクリプションまたは Resource Group への `Contributor` 以上の権限
-- Azure resource provider `Microsoft.MachineLearningServices` が登録済み
+- Azure CLI authenticated to the target subscription
+- `Contributor` or higher permissions on the target subscription or resource group
+- The Azure resource provider `Microsoft.MachineLearningServices` registered in the target subscription
 
-この構成では、制限付き権限の環境でも `terraform plan` が不要な Resource Provider 登録で止まらないよう、`azurerm` provider の `resource_provider_registrations` を `none` にしています。そのため、必要な resource provider は事前に明示登録してください。
+This configuration sets `resource_provider_registrations` to `none` for the `azurerm` provider so that `terraform plan` does not fail in restricted-permission environments because of automatic resource provider registration attempts. Register the required resource providers explicitly before running Terraform.
 
-`Microsoft.MachineLearningServices` が未登録の場合は、登録権限を持つアカウントで以下を実行します。
+If `Microsoft.MachineLearningServices` is not registered, run the following commands with an account that has permission to register resource providers:
 
 ```bash
 az provider register --namespace Microsoft.MachineLearningServices
 az provider show --namespace Microsoft.MachineLearningServices --query registrationState -o tsv
 ```
 
-## 使い方
+## Usage
 
-サンプル変数ファイルをコピーします。
+Copy the sample variable file:
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-`terraform.tfvars` の値を環境に合わせて変更します。
+Edit `terraform.tfvars` for your environment:
 
 ```hcl
 resource_group_name = "rg-aml-registry-demo"
@@ -75,7 +75,7 @@ tags = {
 }
 ```
 
-Terraform を初期化・検証・実行します。
+Initialize, validate, and apply the Terraform configuration:
 
 ```bash
 terraform init
@@ -85,20 +85,20 @@ terraform plan
 terraform apply
 ```
 
-`terraform.tfvars` を作成しない場合は、`terraform plan` 時に `registry_name` の入力を求められます。非対話で実行したい場合は `terraform.tfvars` を作成するか、`-var 'registry_name=<name>'` のように指定してください。
+If you do not create `terraform.tfvars`, Terraform prompts for `registry_name` during `terraform plan`. For non-interactive runs, create `terraform.tfvars` or pass the value explicitly, for example `-var 'registry_name=<name>'`.
 
-## 単一リージョン構成
+## Single-region configuration
 
-`replication_locations = null` の場合、`location` と同じリージョンだけを使う単一リージョン構成になります。
+When `replication_locations = null`, the registry is configured as a single-region registry that uses the same region as `location`.
 
 ```hcl
 location              = "japaneast"
 replication_locations = null
 ```
 
-## 複数リージョン構成
+## Multi-region configuration
 
-複数リージョンにする場合は、primary location を含めて `replication_locations` を指定します。
+To configure multiple regions, set `replication_locations` and include the primary location in the list.
 
 ```hcl
 location = "japaneast"
@@ -113,13 +113,13 @@ replication_locations = [
 ]
 ```
 
-Azure Machine Learning Registry は primary location を作成後に変更できません。リージョン設計は、今ある workspace と今後追加予定の workspace の場所を踏まえて決めるのがおすすめです。
+The primary location of an Azure Machine Learning Registry cannot be changed after creation. Choose regions based on the locations of your current workspaces and any workspaces you expect to add later.
 
-## Storage / ACR 設定を指定する例
+## Storage and ACR settings
 
-通常は指定不要です。指定しない場合、モジュールが Registry 名・リージョン・Resource Group ID から system-created Storage / ACR 名を生成し、Storage は `Standard_LRS`、ACR は `Premium` を使います。
+In most cases, you do not need to specify Storage or ACR settings. If omitted, the module generates system-created Storage/ACR names from the registry name, region, and resource group ID. The default Storage account type is `Standard_LRS`, and the default ACR SKU is `Premium`.
 
-必要な場合のみ、各 replication location に system-created Storage / ACR の設定を追加します。
+Only add system-created Storage/ACR settings to each replication location when you need to customize them:
 
 ```hcl
 replication_locations = [
@@ -133,7 +133,7 @@ replication_locations = [
 ]
 ```
 
-明示的な名前を指定する場合は、Azure の命名制約に注意してください。
+If you specify explicit names, make sure they meet Azure naming requirements:
 
 ```hcl
 replication_locations = [
@@ -145,28 +145,28 @@ replication_locations = [
 ]
 ```
 
-自動生成名が既存リソースと衝突した場合も、同じように `storage_account_name` と `acr_name` を明示指定してください。
+If an automatically generated name conflicts with an existing Azure resource, set `storage_account_name` and `acr_name` explicitly in the same way.
 
-## Public Network Access
+## Public network access
 
-既定は `Enabled` です。
+Public network access is enabled by default.
 
 ```hcl
 public_network_access = "Enabled"
 ```
 
-本番の閉域構成では `Disabled` にしたうえで Private Endpoint / Private DNS / VNet 連携を追加する構成を推奨します。このリポジトリではまず最小構成に絞り、Private Endpoint は後続拡張の想定です。
+For production environments that require private connectivity, set this to `Disabled` and extend the configuration with Private Endpoint, Private DNS, and VNet integration. This repository intentionally focuses on a minimal starting point; private networking can be added as a follow-up enhancement.
 
 ## User-assigned managed identity
 
-既定は system-assigned managed identity です。
+The default identity configuration uses a system-assigned managed identity.
 
 ```hcl
 identity_type = "SystemAssigned"
 identity_ids  = []
 ```
 
-User-assigned identity を使う場合は、既存 identity の ARM ID を指定します。
+To use a user-assigned managed identity, provide the ARM resource ID of an existing identity:
 
 ```hcl
 identity_type = "UserAssigned"
@@ -184,23 +184,23 @@ identity_ids = [
 - `discovery_url`
 - `mlflow_registry_uri`
 
-`discovery_url` と `mlflow_registry_uri` は Azure Machine Learning から返される値です。作成前の `plan` では unknown になります。
+`discovery_url` and `mlflow_registry_uri` are values returned by Azure Machine Learning. They are unknown during `terraform plan` before the registry is created.
 
-## 注意点
+## Notes
 
-- Registry 名は Microsoft Entra tenant 内で一意にする必要があります。
-- Registry 名は作成後に変更できません。
-- primary location は作成後に変更できません。
-- AzAPI 作成では各 `regionDetails` に Storage/ACR 詳細が必要です。このモジュールは既定値を生成して 400 `Neither StorageAccountDetails nor AcrAccountDetails is provided` を避けます。
-- Azure Machine Learning Registry が新規作成する system-created ACR の SKU は `Premium` のみサポートされます。
-- `Microsoft.MachineLearningServices` resource provider の登録が必要です。
-- `azurerm` provider の自動 Resource Provider 登録は無効化しています。`Microsoft.AppConfiguration` など、この構成に不要な provider 登録で `plan` が止まることを避けるためです。
-- Terraform state には Azure リソース ID などが保存されます。チーム利用では Azure Storage backend などの remote backend と state lock の導入を推奨します。
+- The registry name must be unique within the Microsoft Entra tenant.
+- The registry name cannot be changed after creation.
+- The primary location cannot be changed after creation.
+- AzAPI registry creation requires Storage/ACR details in each `regionDetails` entry. This module generates defaults to avoid the `400 Neither StorageAccountDetails nor AcrAccountDetails is provided` error.
+- Azure Machine Learning Registry supports only `Premium` for newly created system-created ACR resources.
+- The `Microsoft.MachineLearningServices` resource provider must be registered before deployment.
+- Automatic resource provider registration in the `azurerm` provider is disabled to avoid `plan` failures caused by providers that are not required by this configuration, such as `Microsoft.AppConfiguration`.
+- Terraform state stores Azure resource IDs and other deployment metadata. For team usage, use a remote backend such as Azure Storage and enable state locking.
 
-## 今後の拡張候補
+## Possible future enhancements
 
-- Azure Storage backend による Terraform state 管理
-- Private Endpoint / Private DNS による閉域構成
-- 既存 Resource Group を参照する構成
-- CI/CD での `terraform fmt` / `validate` / `plan`
-- Azure RBAC role assignment for registry asset readers/writers
+- Manage Terraform state with an Azure Storage backend
+- Add private networking with Private Endpoint and Private DNS
+- Support referencing an existing resource group
+- Add CI/CD checks for `terraform fmt`, `terraform validate`, and `terraform plan`
+- Add Azure RBAC role assignments for registry asset readers and writers
